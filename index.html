@@ -1559,6 +1559,7 @@ async function tomarFoto(){
 let measureEditor=null;
 let measureCanvas=null;
 let measureCtx=null;
+let measureImage=null;
 
 let measurePoints={
     r1:null,
@@ -1583,39 +1584,27 @@ function abrirEditorMedicion(){
     measureCanvas=document.createElement('canvas');
     measureCanvas.className='measureCanvas';
 
-    measureEditor.appendChild(
-        measureCanvas
-    );
+    measureEditor.appendChild(measureCanvas);
 
     const instruction=document.createElement('div');
 
-    instruction.className=
-        'measureInstruction';
+    instruction.className='measureInstruction';
+    instruction.id='measureInstruction';
 
-    instruction.id=
-        'measureInstruction';
-
-    measureEditor.appendChild(
-        instruction
-    );
+    measureEditor.appendChild(instruction);
 
     const toolbar=document.createElement('div');
-
-    toolbar.className=
-        'measureToolbar';
+    toolbar.className='measureToolbar';
 
     const undo=document.createElement('button');
-
     undo.id='measureUndo';
     undo.textContent='↩ DESHACER';
 
     const finish=document.createElement('button');
-
     finish.id='measureFinish';
     finish.textContent='✅ TERMINAR';
 
     const cancel=document.createElement('button');
-
     cancel.id='measureCancel';
     cancel.textContent='❌ CANCELAR';
 
@@ -1629,15 +1618,15 @@ function abrirEditorMedicion(){
         .getElementById('cameraContainer')
         .appendChild(measureEditor);
 
-    const im=new Image();
+    measureImage=new Image();
 
-    im.onload=()=>{
+    measureImage.onload=()=>{
 
         measureCanvas.width=
-            im.naturalWidth;
+            measureImage.naturalWidth;
 
         measureCanvas.height=
-            im.naturalHeight;
+            measureImage.naturalHeight;
 
         ajustarCanvasMedicion();
 
@@ -1672,12 +1661,22 @@ function abrirEditorMedicion(){
         actualizarInstruccion();
     };
 
-    im.src=fotoBase;
+    measureImage.onerror=()=>{
+
+        setStatus(
+            '❌ No se pudo cargar la fotografía para medir.'
+        );
+
+        cerrarEditorMedicion();
+    };
+
+    measureImage.src=fotoBase;
 
     takeButton.style.display='none';
     signalButton.style.display='none';
     cancelButton.style.display='none';
 }
+
 
 /* =========================================================
    AJUSTE CANVAS MEDICION
@@ -1824,136 +1823,156 @@ function actualizarInstruccion(){
 
 function dibujarEditorMedicion(){
 
-    if(!measureCanvas)
+    if(
+        !measureCanvas ||
+        !measureImage
+    )
         return;
 
     const c=
         measureCanvas.getContext('2d');
 
+    const w=measureCanvas.width;
+    const h=measureCanvas.height;
+
     c.clearRect(
         0,
         0,
-        measureCanvas.width,
-        measureCanvas.height
+        w,
+        h
     );
 
-    const im=new Image();
+    /*
+       FOTO ORIGINAL
+    */
 
-    im.onload=()=>{
+    c.drawImage(
+        measureImage,
+        0,
+        0,
+        w,
+        h
+    );
 
-        c.drawImage(
-            im,
-            0,
-            0,
-            measureCanvas.width,
-            measureCanvas.height
+    const p=measurePoints;
+
+    /*
+       REFERENCIA R1-R2
+    */
+
+    if(p.r1&&p.r2){
+
+        c.beginPath();
+
+        c.moveTo(
+            p.r1.x,
+            p.r1.y
         );
 
-        const p=measurePoints;
-
-        if(p.r1&&p.r2){
-
-            c.beginPath();
-
-            c.moveTo(
-                p.r1.x,
-                p.r1.y
-            );
-
-            c.lineTo(
-                p.r2.x,
-                p.r2.y
-            );
-
-            c.strokeStyle='#ff9800';
-
-            c.lineWidth=Math.max(
-                4,
-                measureCanvas.width/500
-            );
-
-            c.stroke();
-        }
-
-        if(p.base&&p.punta){
-
-            c.beginPath();
-
-            c.moveTo(
-                p.base.x,
-                p.base.y
-            );
-
-            c.lineTo(
-                p.punta.x,
-                p.punta.y
-            );
-
-            c.strokeStyle='#00e5ff';
-
-            c.lineWidth=Math.max(
-                4,
-                measureCanvas.width/500
-            );
-
-            c.stroke();
-        }
-
-        dibujarPuntoCanvas(
-            c,
-            p.r1,
-            '#ff9800',
-            'R1'
+        c.lineTo(
+            p.r2.x,
+            p.r2.y
         );
 
-        dibujarPuntoCanvas(
-            c,
-            p.r2,
-            '#9c27b0',
-            'R2'
+        c.strokeStyle='#ff9800';
+
+        c.lineWidth=Math.max(
+            5,
+            w/500
         );
 
-        dibujarPuntoCanvas(
-            c,
-            p.base,
-            '#00aaff',
-            'BASE'
+        c.stroke();
+    }
+
+    /*
+       POSTE BASE-PUNTA
+    */
+
+    if(p.base&&p.punta){
+
+        c.beginPath();
+
+        c.moveTo(
+            p.base.x,
+            p.base.y
         );
 
-        dibujarPuntoCanvas(
-            c,
-            p.punta,
-            '#00c853',
-            'PUNTA'
+        c.lineTo(
+            p.punta.x,
+            p.punta.y
         );
 
-        if(p.base&&p.punta){
+        c.strokeStyle='#00e5ff';
 
-            c.beginPath();
+        c.lineWidth=Math.max(
+            5,
+            w/500
+        );
 
-            c.moveTo(
-                p.base.x,
-                p.base.y
-            );
+        c.stroke();
+    }
 
-            c.lineTo(
-                p.punta.x,
-                p.punta.y
-            );
+    /*
+       PUNTOS
+    */
 
-            c.strokeStyle='#00ff88';
+    dibujarPuntoCanvas(
+        c,
+        p.r1,
+        '#ff9800',
+        'R1'
+    );
 
-            c.lineWidth=Math.max(
-                3,
-                measureCanvas.width/700
-            );
+    dibujarPuntoCanvas(
+        c,
+        p.r2,
+        '#9c27b0',
+        'R2'
+    );
 
-            c.stroke();
-        }
-    };
+    dibujarPuntoCanvas(
+        c,
+        p.base,
+        '#00aaff',
+        'BASE'
+    );
 
-    im.src=fotoBase;
+    dibujarPuntoCanvas(
+        c,
+        p.punta,
+        '#00c853',
+        'PUNTA'
+    );
+
+    /*
+       ALTURA EN VERDE
+    */
+
+    if(p.base&&p.punta){
+
+        c.beginPath();
+
+        c.moveTo(
+            p.base.x,
+            p.base.y
+        );
+
+        c.lineTo(
+            p.punta.x,
+            p.punta.y
+        );
+
+        c.strokeStyle='#00ff88';
+
+        c.lineWidth=Math.max(
+            3,
+            w/700
+        );
+
+        c.stroke();
+    }
 }
+
 
 /* =========================================================
    PUNTO CANVAS
@@ -2373,6 +2392,7 @@ function cerrarEditorMedicion(){
 
     measureCanvas=null;
     measureCtx=null;
+    measureImage=null;
 
     measurePoints={
         r1:null,
@@ -2391,6 +2411,7 @@ function cerrarEditorMedicion(){
     if(modo==='normal')
         signalButton.style.display='inline-block';
 }
+
 
 /* =========================================================
    PLOMADO FINAL
