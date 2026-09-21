@@ -482,7 +482,10 @@ const params = new URLSearchParams(location.search);
 
 const tipo = params.get('tipo') || 'poste';
 
-let modo = params.get('modo') || 'normal';
+const modoParametro =
+    String(params.get('modo') || '')
+        .trim()
+        .toLowerCase();
 
 const tipoNormalizado =
     String(tipo)
@@ -494,9 +497,25 @@ const tipoNormalizado =
    DETERMINAR MODO DE CAMERA STAMP
 ========================================================= */
 
+/*
+   PRIORIDAD:
+
+   1. modo=medir
+   2. modo=plomado
+   3. detección por tipo
+   4. normal
+*/
+
+let modo = 'normal';
+
+
+/* ================= MEDICION ================= */
+
 if(
-    tipoNormalizado === 'medicionposte' ||
-    tipoNormalizado === 'medir poste'
+    modoParametro === 'medir' ||
+    modoParametro === 'medicion' ||
+    modoParametro === 'medicionposte' ||
+    modoParametro === 'medirposte'
 ){
 
     modo = 'medir';
@@ -504,7 +523,31 @@ if(
 }
 
 
-if(
+/* ================= PLOMADO ================= */
+
+else if(
+    modoParametro === 'plomado' ||
+    modoParametro === 'plomado poste'
+){
+
+    modo = 'plomado';
+
+}
+
+
+/* ================= DETECCION POR TIPO ================= */
+
+else if(
+    tipoNormalizado === 'medicionposte' ||
+    tipoNormalizado === 'medir poste' ||
+    tipoNormalizado === 'medirposte'
+){
+
+    modo = 'medir';
+
+}
+
+else if(
     tipoNormalizado === 'plomado' ||
     tipoNormalizado === 'plomado poste'
 ){
@@ -512,6 +555,18 @@ if(
     modo = 'plomado';
 
 }
+
+
+/* ================= DIAGNOSTICO ================= */
+
+console.log('=================================');
+console.log('CAMERA STAMP PARAMETROS');
+console.log('tipo:', tipo);
+console.log('modoParametro:', modoParametro);
+console.log('modo FINAL:', modo);
+console.log('URL:', window.location.href);
+console.log('=================================');
+
 
 
 const proyecto=params.get('proyecto')||'';
