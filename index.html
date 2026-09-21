@@ -676,6 +676,315 @@ function clamp(v,a,b){
 }
 
 /* =========================================================
+   ZONAS PROTEGIDAS
+   ESTAMPADO + LOGO
+========================================================= */
+
+function calcularZonasProtegidas(w, h){
+
+    const zonas = [];
+
+    /*
+       ==============================
+       ZONA DEL ESTAMPADO
+       ==============================
+    */
+
+    const s = Math.max(w, h) / 1200;
+
+    const pad = Math.round(16 * s);
+    const font = Math.max(16, Math.round(20 * s));
+    const line = 27 * s;
+
+    const pos = gpsActual;
+    const d = fechaFoto || new Date();
+
+    const base = [
+        `PROYECTO: ${proyecto || 'SIN PROYECTO'}`,
+        `TIPO PROYECTO: ${tipoProyecto || 'SIN TIPO'}`,
+        `HUB: ${hub || '-'}  RAMA: ${rama || '-'}`,
+        `TIPO FOTO: ${nombreTipo(tipo)}`,
+        `${d.toLocaleDateString('es-MX')}  ${d.toLocaleTimeString('es-MX')}`,
+        pos
+            ? `LAT: ${Number(pos.lat).toFixed(6)}  LON: ${Number(pos.lng).toFixed(6)}`
+            : 'GPS: SIN UBICACIÓN'
+    ];
+
+    const temp =
+        document.createElement('canvas');
+
+    const tc =
+        temp.getContext('2d');
+
+    tc.font = `bold ${font}px Arial`;
+
+    let tw = 0;
+
+    base.forEach(t => {
+        tw = Math.max(
+            tw,
+            tc.measureText(t).width
+        );
+    });
+
+    const bw =
+        tw +
+        pad * 2;
+
+    const bh =
+        base.length * line +
+        pad * 2;
+
+    const x = pad;
+    const y = h - bh - pad;
+
+    zonas.push({
+        tipo: 'estampado',
+        x: x - 18,
+        y: y - 18,
+        width: bw + 36,
+        height: bh + 36
+    });
+
+
+    /*
+       ==============================
+       ZONA DEL LOGO
+       ==============================
+    */
+
+    if(logoListo && logoImagen){
+
+        const maxW = w * .18;
+        const maxH = h * .14;
+
+        const escala = Math.min(
+            maxW / logoImagen.width,
+            maxH / logoImagen.height
+        );
+
+        const lw =
+            logoImagen.width * escala;
+
+        const lh =
+            logoImagen.height * escala;
+
+        const m =
+            Math.max(20, w * .025);
+
+        const lx =
+            w - lw - m;
+
+        const ly = m;
+
+        const b =
+            Math.max(15, w * .012);
+
+        zonas.push({
+            tipo: 'logo',
+            x: lx - b,
+            y: ly - b,
+            width: lw + b * 2,
+            height: lh + b * 2
+        });
+    }
+
+    return zonas;
+}
+
+
+/* =========================================================
+   PUNTO DENTRO DE ZONA PROTEGIDA
+========================================================= */
+
+function puntoEnZonaProtegida(
+    x,
+    y,
+    margen = 0
+){
+
+    const zonas =
+        calcularZonasProtegidas(
+            canvas.width,
+            canvas.height
+        );
+
+    return zonas.some(z =>
+        x >= z.x - margen &&
+        x <= z.x + z.width + margen &&
+        y >= z.y - margen &&
+        y <= z.y + z.height + margen
+    );
+}
+
+
+/* =========================================================
+   LINEA INTERSECTA ZONA
+========================================================= */
+
+function orientacionSegmento(
+    ax, ay,
+    bx, by,
+    cx, cy
+){
+
+    const v =
+        (by - ay) * (cx - bx) -
+        (bx - ax) * (cy - by);
+
+    if(Math.abs(v) < 0.00001)
+        return 0;
+
+    return v > 0 ? 1 : 2;
+}
+
+
+function segmentosIntersectan(
+    a,b,c,d
+){
+
+    const o1 =
+        orientacionSegmento(
+            a.x,a.y,
+            b.x,b.y,
+            c.x,c.y
+        );
+
+    const o2 =
+        orientacionSegmento(
+            a.x,a.y,
+            b.x,b.y,
+            d.x,d.y
+        );
+
+    const o3 =
+        orientacionSegmento(
+            c.x,c.y,
+            d.x,d.y,
+            a.x,a.y
+        );
+
+    const o4 =
+        orientacionSegmento(
+            c.x,c.y,
+            d.x,d.y,
+            b.x,b.y
+        );
+
+    return (
+        o1 !== o2 &&
+        o3 !== o4
+    );
+}
+
+
+function segmentoIntersecaRectangulo(
+    a,
+    b,
+    z,
+    margen = 0
+){
+
+    const r = {
+        x: z.x - margen,
+        y: z.y - margen,
+        width: z.width + margen * 2,
+        height: z.height + margen * 2
+    };
+
+    /*
+       Uno de los extremos está dentro
+    */
+
+    if(
+        a.x >= r.x &&
+        a.x <= r.x+r.width &&
+        a.y >= r.y &&
+        a.y <= r.y+r.height
+    )
+        return true;
+
+    if(
+        b.x >= r.x &&
+        b.x <= r.x+r.width &&
+        b.y >= r.y &&
+        b.y <= r.y+r.height
+    )
+        return true;
+
+
+    /*
+       Bordes
+    */
+
+    const p1={x:r.x,y:r.y};
+    const p2={x:r.x+r.width,y:r.y};
+    const p3={
+        x:r.x+r.width,
+        y:r.y+r.height
+    };
+    const p4={
+        x:r.x,
+        y:r.y+r.height
+    };
+
+    return (
+        segmentosIntersectan(a,b,p1,p2) ||
+        segmentosIntersectan(a,b,p2,p3) ||
+        segmentosIntersectan(a,b,p3,p4) ||
+        segmentosIntersectan(a,b,p4,p1)
+    );
+}
+
+
+function lineaEnZonaProtegida(
+    a,
+    b,
+    margen = 10
+){
+
+    const zonas =
+        calcularZonasProtegidas(
+            canvas.width,
+            canvas.height
+        );
+
+    return zonas.some(z =>
+        segmentoIntersecaRectangulo(
+            a,
+            b,
+            z,
+            margen
+        )
+    );
+}
+
+
+/* =========================================================
+   MENSAJE DE ZONA PROTEGIDA
+========================================================= */
+
+function avisarZonaProtegida(){
+
+    setStatus(
+        '🚫 ZONA PROTEGIDA\n' +
+        'No se puede colocar una marca, línea o flecha sobre el ESTAMPADO o LOGO.'
+    );
+
+    /*
+       Vibración en dispositivos compatibles
+    */
+
+    if(
+        navigator.vibrate
+    ){
+
+        navigator.vibrate(120);
+    }
+}
+
+    
+/* =========================================================
    LOGO
 ========================================================= */
 
@@ -1800,7 +2109,26 @@ function manejarClickMedicion(e){
 
     e.preventDefault();
 
-    const p=puntoMedicion(e);
+    const p = puntoMedicion(e);
+
+    /*
+       Protección contra puntos sobre
+       ESTAMPADO / LOGO
+    */
+
+    if(
+        puntoEnZonaProtegida(
+            p.x,
+            p.y,
+            20
+        )
+    ){
+
+        avisarZonaProtegida();
+
+        return;
+    }
+
 
     if(measureStep==='r1'){
 
@@ -1810,14 +2138,91 @@ function manejarClickMedicion(e){
     }else if(measureStep==='r2'){
 
         measurePoints.r2=p;
+
+        /*
+           R1-R2 tampoco puede atravesar
+           una zona protegida.
+        */
+
+        if(
+            lineaEnZonaProtegida(
+                measurePoints.r1,
+                measurePoints.r2,
+                15
+            )
+        ){
+
+            measurePoints.r2=null;
+            measureStep='r2';
+
+            avisarZonaProtegida();
+
+            return;
+        }
+
         measureStep='base';
 
     }else if(measureStep==='base'){
 
         measurePoints.base=p;
+
+        /*
+           Si ya existe PUNTA, validar línea.
+        */
+
+        if(measurePoints.punta){
+
+            if(
+                lineaEnZonaProtegida(
+                    measurePoints.base,
+                    measurePoints.punta,
+                    15
+                )
+            ){
+
+                measurePoints.base=null;
+                measureStep='base';
+
+                avisarZonaProtegida();
+
+                return;
+            }
+        }
+
         measureStep='punta';
 
     }else if(measureStep==='punta'){
+
+        /*
+           Validar antes de aceptar PUNTA
+        */
+
+        if(
+            puntoEnZonaProtegida(
+                p.x,
+                p.y,
+                20
+            )
+        ){
+
+            avisarZonaProtegida();
+
+            return;
+        }
+
+        if(
+            measurePoints.base &&
+            lineaEnZonaProtegida(
+                measurePoints.base,
+                p,
+                15
+            )
+        ){
+
+            avisarZonaProtegida();
+
+            return;
+        }
 
         measurePoints.punta=p;
         measureStep='done';
@@ -1826,6 +2231,133 @@ function manejarClickMedicion(e){
     dibujarEditorMedicion();
     actualizarInstruccion();
 }
+
+/* =========================================================
+   FLECHA SOBRE ZONA PROTEGIDA
+========================================================= */
+
+function flechaInvadeZonaProtegida(){
+
+    if(!flechaCanvas)
+        return false;
+
+    const w = flechaCanvas.width;
+
+    const longitud =
+        Math.max(
+            120,
+            w * .22 * flechaEscala
+        );
+
+    const ancho =
+        Math.max(
+            22,
+            w * .035 * flechaEscala
+        );
+
+    /*
+       Radio aproximado de seguridad.
+       Incluye cuerpo + punta + contorno.
+    */
+
+    const radio =
+        Math.max(
+            ancho * 2.2,
+            longitud * .10
+        );
+
+    /*
+       Puntos principales de la flecha.
+    */
+
+    const cos =
+        Math.cos(flechaAngulo);
+
+    const sin =
+        Math.sin(flechaAngulo);
+
+    function transformar(x,y){
+
+        return {
+            x:
+                flechaX +
+                x*cos -
+                y*sin,
+
+            y:
+                flechaY +
+                x*sin +
+                y*cos
+        };
+    }
+
+    const base =
+        transformar(
+            0,
+            longitud*.48
+        );
+
+    const punta =
+        transformar(
+            0,
+            -longitud*.52
+        );
+
+    const zonas =
+        calcularZonasProtegidas(
+            canvas.width,
+            canvas.height
+        );
+
+    return zonas.some(z => {
+
+        /*
+           El cuerpo de la flecha
+        */
+
+        if(
+            segmentoIntersecaRectangulo(
+                base,
+                punta,
+                z,
+                radio
+            )
+        )
+            return true;
+
+
+        /*
+           La punta también se considera
+           una zona protegida.
+        */
+
+        if(
+            punta.x >= z.x-radio &&
+            punta.x <= z.x+z.width+radio &&
+            punta.y >= z.y-radio &&
+            punta.y <= z.y+z.height+radio
+        )
+            return true;
+
+
+        /*
+           El centro de la flecha
+        */
+
+        if(
+            flechaX >= z.x-radio &&
+            flechaX <= z.x+z.width+radio &&
+            flechaY >= z.y-radio &&
+            flechaY <= z.y+z.height+radio
+        )
+            return true;
+
+
+        return false;
+    });
+}
+
+    
 
 /* =========================================================
    INSTRUCCIONES
@@ -2176,6 +2708,27 @@ function finalizarMedicion(){
 
     const resultado=
         calcularMedicion();
+
+    if(
+    lineaEnZonaProtegida(
+        measurePoints.r1,
+        measurePoints.r2,
+        15
+    ) ||
+    lineaEnZonaProtegida(
+        measurePoints.base,
+        measurePoints.punta,
+        15
+    )
+){
+
+    alert(
+        'La medición invade una zona protegida del estampado o logo. Corrige los puntos antes de terminar.'
+    );
+
+    return;
+}
+
 
     if(!resultado){
 
@@ -3342,9 +3895,27 @@ function flechaPointerMove(e){
             );
 
 
-        limitarFlecha();
+        const xAnterior = flechaX;
+const yAnterior = flechaY;
+const anguloAnterior = flechaAngulo;
+const escalaAnterior = flechaEscala;
 
-        dibujarEditorFlecha();
+limitarFlecha();
+
+if(flechaInvadeZonaProtegida()){
+
+    flechaX = xAnterior;
+    flechaY = yAnterior;
+    flechaAngulo = anguloAnterior;
+    flechaEscala = escalaAnterior;
+
+    avisarZonaProtegida();
+
+}else{
+
+    dibujarEditorFlecha();
+}
+
 
         return;
     }
@@ -3436,6 +4007,34 @@ function flechaPointerMove(e){
     }
 }
 
+    function aplicarTransformacionFlecha(){
+
+    const xAnterior = flechaX;
+    const yAnterior = flechaY;
+    const anguloAnterior = flechaAngulo;
+    const escalaAnterior = flechaEscala;
+
+    limitarFlecha();
+
+    if(
+        flechaInvadeZonaProtegida()
+    ){
+
+        flechaX = xAnterior;
+        flechaY = yAnterior;
+        flechaAngulo = anguloAnterior;
+        flechaEscala = escalaAnterior;
+
+        avisarZonaProtegida();
+
+        return false;
+    }
+
+    dibujarEditorFlecha();
+
+    return true;
+}
+
 
 /* =========================================================
    POINTER UP
@@ -3522,6 +4121,17 @@ function finalizarFlecha(){
 
     if(!fotoBase)
         return;
+
+    if(
+    flechaInvadeZonaProtegida()
+){
+
+    alert(
+        'La flecha invade el área protegida del estampado o logo.'
+    );
+
+    return;
+}
 
 
     const finalCanvas =
