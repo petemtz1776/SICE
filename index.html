@@ -478,16 +478,41 @@ window.addEventListener('unhandledrejection', function(e){
    PARAMETROS
 ========================================================= */
 
-const params=new URLSearchParams(location.search);
+const params = new URLSearchParams(location.search);
 
-const tipo=params.get('tipo')||'poste';
-let modo=params.get('modo')||'normal';
+const tipo = params.get('tipo') || 'poste';
 
-if(String(tipo).trim().toUpperCase()==='MEDIR POSTE')
-    modo='medir';
+let modo = params.get('modo') || 'normal';
 
-if(String(tipo).trim().toUpperCase()==='PLOMADO POSTE')
-    modo='plomado';
+const tipoNormalizado =
+    String(tipo)
+        .trim()
+        .toLowerCase();
+
+
+/* =========================================================
+   DETERMINAR MODO DE CAMERA STAMP
+========================================================= */
+
+if(
+    tipoNormalizado === 'medicionposte' ||
+    tipoNormalizado === 'medir poste'
+){
+
+    modo = 'medir';
+
+}
+
+
+if(
+    tipoNormalizado === 'plomado' ||
+    tipoNormalizado === 'plomado poste'
+){
+
+    modo = 'plomado';
+
+}
+
 
 const proyecto=params.get('proyecto')||'';
 const tipoProyecto=params.get('tipoProyecto')||'';
