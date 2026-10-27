@@ -363,6 +363,47 @@ button:disabled{
         font-size:19px;
     }
 }
+
+/* El editor queda como fondo de la medición */
+.measureEditor {
+    position: absolute;
+    inset: 0;
+    z-index: 50;
+    background: #000;
+    overflow: hidden;
+    touch-action: none;
+}
+
+/* La foto queda debajo de los controles */
+.measureCanvas {
+    position: absolute;
+    z-index: 1;
+    display: block;
+    touch-action: none;
+}
+
+/* La mira no debe bloquear ningún toque */
+#miraMedicion {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    pointer-events: none;
+}
+
+/* Los botones siempre deben quedar por encima de la foto */
+.measureToolbar {
+    position: absolute;
+    z-index: 100;
+    pointer-events: auto;
+}
+
+/* El texto de instrucciones no debe bloquear los controles */
+.measureInstruction {
+    position: absolute;
+    z-index: 90;
+    pointer-events: none;
+}
+    
 </style>
 </head>
 
