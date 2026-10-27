@@ -240,6 +240,8 @@ button:disabled{
     touch-action:none;
 }
 
+
+    
 /* ================= PUNTOS ================= */
 
 .measurePoint{
@@ -1938,43 +1940,106 @@ let measureStep='r1';
    ABRIR EDITOR
 ========================================================= */
 
+
 function abrirEditorMedicion(){
 
     cerrarEditorMedicion();
 
-    measureEditor=document.createElement('div');
-    measureEditor.className='measureEditor';
+    measureEditor = document.createElement('div');
+    measureEditor.className = 'measureEditor';
+    measureEditor.style.position = 'absolute';
+    measureEditor.style.overflow = 'hidden';
+    measureEditor.style.touchAction = 'none';
 
-    measureCanvas=document.createElement('canvas');
-    measureCanvas.className='measureCanvas';
+    measureCanvas = document.createElement('canvas');
+    measureCanvas.className = 'measureCanvas';
 
     measureEditor.appendChild(measureCanvas);
 
-    const instruction=document.createElement('div');
+    // MIRA FIJA DE PRECISIÓN
+    const miraMedicion = document.createElement('div');
+    miraMedicion.id = 'miraMedicion';
 
-    instruction.className='measureInstruction';
-    instruction.id='measureInstruction';
+    miraMedicion.style.cssText = `
+        position:absolute;
+        inset:0;
+        z-index:20;
+        pointer-events:none;
+    `;
 
+    miraMedicion.innerHTML = `
+        <div style="
+            position:absolute;
+            left:0;
+            right:0;
+            top:50%;
+            height:1px;
+            background:#00ffff;
+            box-shadow:0 0 2px #000;
+        "></div>
+
+        <div style="
+            position:absolute;
+            top:0;
+            bottom:0;
+            left:50%;
+            width:1px;
+            background:#00ffff;
+            box-shadow:0 0 2px #000;
+        "></div>
+
+        <div style="
+            position:absolute;
+            left:50%;
+            top:50%;
+            width:14px;
+            height:14px;
+            border:2px solid white;
+            border-radius:50%;
+            transform:translate(-50%,-50%);
+            box-shadow:0 0 3px #000;
+        "></div>
+    `;
+
+    measureEditor.appendChild(miraMedicion);
+
+    // INSTRUCCIONES
+    const instruction = document.createElement('div');
+    instruction.className = 'measureInstruction';
+    instruction.id = 'measureInstruction';
     measureEditor.appendChild(instruction);
 
-    const toolbar=document.createElement('div');
-    toolbar.className='measureToolbar';
+    // BARRA DE HERRAMIENTAS
+    const toolbar = document.createElement('div');
+    toolbar.className = 'measureToolbar';
 
-    const undo=document.createElement('button');
-    undo.id='measureUndo';
-    undo.textContent='↩ DESHACER';
+    const undo = document.createElement('button');
+    undo.id = 'measureUndo';
+    undo.textContent = '↩ DESHACER';
 
-    const finish=document.createElement('button');
-    finish.id='measureFinish';
-    finish.textContent='✅ TERMINAR';
+    const finish = document.createElement('button');
+    finish.id = 'measureFinish';
+    finish.textContent = '✅ TERMINAR';
 
-    const cancel=document.createElement('button');
-    cancel.id='measureCancel';
-    cancel.textContent='❌ CANCELAR';
+    const cancel = document.createElement('button');
+    cancel.id = 'measureCancel';
+    cancel.textContent = '❌ CANCELAR';
+
+    const zoomMenos = document.createElement('button');
+    zoomMenos.textContent = '− ZOOM';
+
+    const zoomMas = document.createElement('button');
+    zoomMas.textContent = '+ ZOOM';
+
+    const zoomReset = document.createElement('button');
+    zoomReset.textContent = 'AJUSTAR';
 
     toolbar.appendChild(undo);
     toolbar.appendChild(finish);
     toolbar.appendChild(cancel);
+    toolbar.appendChild(zoomMenos);
+    toolbar.appendChild(zoomMas);
+    toolbar.appendChild(zoomReset);
 
     measureEditor.appendChild(toolbar);
 
@@ -1982,50 +2047,60 @@ function abrirEditorMedicion(){
         .getElementById('cameraContainer')
         .appendChild(measureEditor);
 
-    measureImage=new Image();
+    // CARGAR FOTO
+    measureImage = new Image();
 
-    measureImage.onload=()=>{
+    measureImage.onload = () => {
 
-        measureCanvas.width=
-            measureImage.naturalWidth;
-
-        measureCanvas.height=
-            measureImage.naturalHeight;
+        measureCanvas.width = measureImage.naturalWidth;
+        measureCanvas.height = measureImage.naturalHeight;
 
         ajustarCanvasMedicion();
-
         dibujarEditorMedicion();
 
+        // MOVIMIENTO DE FOTO Y COLOCACIÓN CON LA MIRA
         measureCanvas.addEventListener(
             'pointerdown',
-            manejarClickMedicion
+            iniciarMovimientoMedicion
         );
 
-        undo.addEventListener(
-            'click',
-            deshacerMedicion
+        measureCanvas.addEventListener(
+            'pointermove',
+            moverImagenMedicion
         );
 
-        finish.addEventListener(
-            'click',
-            finalizarMedicion
+        measureCanvas.addEventListener(
+            'pointerup',
+            terminarMovimientoMedicion
         );
 
-        cancel.addEventListener(
-            'click',
-            ()=>{
-                cerrarEditorMedicion();
+        // BOTONES
+        undo.addEventListener('click', deshacerMedicion);
+        finish.addEventListener('click', finalizarMedicion);
 
-                setStatus(
-                    'Medición cancelada. Puedes tomar otra fotografía.'
-                );
-            }
-        );
+        cancel.addEventListener('click', () => {
+            cerrarEditorMedicion();
+            setStatus(
+                'Medición cancelada. Puedes tomar otra fotografía.'
+            );
+        });
+
+        zoomMas.addEventListener('click', () => {
+            zoomMedicion(1.25);
+        });
+
+        zoomMenos.addEventListener('click', () => {
+            zoomMedicion(0.8);
+        });
+
+        zoomReset.addEventListener('click', () => {
+            restablecerVistaMedicion();
+        });
 
         actualizarInstruccion();
     };
 
-    measureImage.onerror=()=>{
+    measureImage.onerror = () => {
 
         setStatus(
             '❌ No se pudo cargar la fotografía para medir.'
@@ -2034,76 +2109,155 @@ function abrirEditorMedicion(){
         cerrarEditorMedicion();
     };
 
-    measureImage.src=fotoBase;
+    measureImage.src = fotoBase;
 
-    takeButton.style.display='none';
-    signalButton.style.display='none';
-    cancelButton.style.display='none';
+    takeButton.style.display = 'none';
+    signalButton.style.display = 'none';
+    cancelButton.style.display = 'none';
 }
+
 
 
 /* =========================================================
    AJUSTE CANVAS MEDICION
 ========================================================= */
 
+    
 function ajustarCanvasMedicion(){
 
-    if(!measureCanvas)
-        return;
+    if(!measureCanvas || !measureEditor) return;
 
-    const container=
-        document.getElementById(
-            'cameraContainer'
-        );
+    const cw = measureEditor.clientWidth;
+    const ch = measureEditor.clientHeight;
+    const iw = measureCanvas.width;
+    const ih = measureCanvas.height;
 
-    const cw=container.clientWidth;
-    const ch=container.clientHeight;
+    const escala = Math.min(cw / iw, ch / ih);
 
-    const iw=measureCanvas.width;
-    const ih=measureCanvas.height;
+    measureView.scale = 1;
+    measureView.baseWidth = iw * escala;
+    measureView.baseHeight = ih * escala;
+    measureView.left = (cw - measureView.baseWidth) / 2;
+    measureView.top = (ch - measureView.baseHeight) / 2;
 
-    const escala=Math.min(
-        cw/iw,
-        ch/ih
+    aplicarVistaMedicion();
+}
+
+function aplicarVistaMedicion(){
+
+    if(!measureCanvas) return;
+
+    measureCanvas.style.width =
+        (measureView.baseWidth * measureView.scale) + 'px';
+
+    measureCanvas.style.height =
+        (measureView.baseHeight * measureView.scale) + 'px';
+
+    measureCanvas.style.left = measureView.left + 'px';
+    measureCanvas.style.top = measureView.top + 'px';
+}
+
+function zoomMedicion(factor){
+
+    if(!measureEditor || !measureCanvas) return;
+
+    const escalaAnterior = measureView.scale;
+    const nuevaEscala = Math.max(
+        1,
+        Math.min(6, escalaAnterior * factor)
     );
 
-    const dw=iw*escala;
-    const dh=ih*escala;
+    const proporcion = nuevaEscala / escalaAnterior;
+    const cx = measureEditor.clientWidth / 2;
+    const cy = measureEditor.clientHeight / 2;
 
-    measureCanvas.style.width=
-        dw+'px';
+    measureView.left =
+        cx - (cx - measureView.left) * proporcion;
 
-    measureCanvas.style.height=
-        dh+'px';
+    measureView.top =
+        cy - (cy - measureView.top) * proporcion;
 
-    measureCanvas.style.left=
-        ((cw-dw)/2)+'px';
+    measureView.scale = nuevaEscala;
 
-    measureCanvas.style.top=
-        ((ch-dh)/2)+'px';
+    aplicarVistaMedicion();
 }
+
+function restablecerVistaMedicion(){
+    ajustarCanvasMedicion();
+}
+
 
 /* =========================================================
    PUNTO MEDICION
 ========================================================= */
 
+
+
 function puntoMedicion(e){
 
-    const r=
-        measureCanvas.getBoundingClientRect();
+    const r = measureCanvas.getBoundingClientRect();
+    const editor = measureEditor.getBoundingClientRect();
 
-    return{
-        x:
-            (e.clientX-r.left)*
-            measureCanvas.width/
-            r.width,
+    const centroX = editor.left + editor.width / 2;
+    const centroY = editor.top + editor.height / 2;
 
-        y:
-            (e.clientY-r.top)*
-            measureCanvas.height/
-            r.height
+    return {
+        x: (centroX - r.left) * measureCanvas.width / r.width,
+        y: (centroY - r.top) * measureCanvas.height / r.height
     };
 }
+
+
+
+function iniciarMovimientoMedicion(e){
+
+    e.preventDefault();
+
+    measureView.startX = e.clientX;
+    measureView.startY = e.clientY;
+    measureView.startLeft = measureView.left;
+    measureView.startTop = measureView.top;
+    measureView.moved = false;
+
+    try {
+        measureCanvas.setPointerCapture(e.pointerId);
+    } catch(err) {}
+}
+
+function moverImagenMedicion(e){
+
+    if(!measureCanvas.hasPointerCapture(e.pointerId)) return;
+
+    const dx = e.clientX - measureView.startX;
+    const dy = e.clientY - measureView.startY;
+
+    if(Math.abs(dx) > 6 || Math.abs(dy) > 6){
+        measureView.moved = true;
+    }
+
+    if(measureView.moved){
+
+        measureView.left = measureView.startLeft + dx;
+        measureView.top = measureView.startTop + dy;
+
+        aplicarVistaMedicion();
+    }
+}
+
+function terminarMovimientoMedicion(e){
+
+    if(!measureCanvas.hasPointerCapture(e.pointerId)) return;
+
+    try {
+        measureCanvas.releasePointerCapture(e.pointerId);
+    } catch(err) {}
+
+    if(!measureView.moved){
+        manejarClickMedicion(e);
+    }
+}
+    
+
 
 function manejarClickMedicion(e){
 
@@ -2408,154 +2562,55 @@ function actualizarInstruccion(){
    DIBUJAR EDITOR
 ========================================================= */
 
+
 function dibujarEditorMedicion(){
 
-    if(
-        !measureCanvas ||
-        !measureImage
-    )
-        return;
+    if(!measureCanvas || !measureImage) return;
 
-    const c=
-        measureCanvas.getContext('2d');
+    const c = measureCanvas.getContext('2d');
+    const w = measureCanvas.width;
+    const h = measureCanvas.height;
 
-    const w=measureCanvas.width;
-    const h=measureCanvas.height;
+    c.clearRect(0, 0, w, h);
 
-    c.clearRect(
-        0,
-        0,
-        w,
-        h
-    );
+    // FOTO ORIGINAL
+    c.drawImage(measureImage, 0, 0, w, h);
 
-    /*
-       FOTO ORIGINAL
-    */
+    const p = measurePoints;
 
-    c.drawImage(
-        measureImage,
-        0,
-        0,
-        w,
-        h
-    );
-
-    const p=measurePoints;
-
-    /*
-       REFERENCIA R1-R2
-    */
-
-    if(p.r1&&p.r2){
-
+    // REFERENCIA R1-R2
+    if(p.r1 && p.r2){
         c.beginPath();
-
-        c.moveTo(
-            p.r1.x,
-            p.r1.y
-        );
-
-        c.lineTo(
-            p.r2.x,
-            p.r2.y
-        );
-
-        c.strokeStyle='#ff9800';
-
-        c.lineWidth=Math.max(
-            5,
-            w/500
-        );
-
+        c.moveTo(p.r1.x, p.r1.y);
+        c.lineTo(p.r2.x, p.r2.y);
+        c.strokeStyle = '#ff9800';
+        c.lineWidth = Math.max(5, w / 500);
         c.stroke();
     }
 
-    /*
-       POSTE BASE-PUNTA
-    */
-
-    if(p.base&&p.punta){
-
+    // POSTE BASE-PUNTA
+    if(p.base && p.punta){
         c.beginPath();
-
-        c.moveTo(
-            p.base.x,
-            p.base.y
-        );
-
-        c.lineTo(
-            p.punta.x,
-            p.punta.y
-        );
-
-        c.strokeStyle='#00e5ff';
-
-        c.lineWidth=Math.max(
-            5,
-            w/500
-        );
-
+        c.moveTo(p.base.x, p.base.y);
+        c.lineTo(p.punta.x, p.punta.y);
+        c.strokeStyle = '#00e5ff';
+        c.lineWidth = Math.max(5, w / 500);
         c.stroke();
     }
 
-    /*
-       PUNTOS
-    */
+    // MARCADORES
+    dibujarPuntoCanvas(c, p.r1, '#ff9800', 'R1');
+    dibujarPuntoCanvas(c, p.r2, '#9c27b0', 'R2');
+    dibujarPuntoCanvas(c, p.base, '#00aaff', 'BASE');
+    dibujarPuntoCanvas(c, p.punta, '#00c853', 'PUNTA');
 
-    dibujarPuntoCanvas(
-        c,
-        p.r1,
-        '#ff9800',
-        'R1'
-    );
-
-    dibujarPuntoCanvas(
-        c,
-        p.r2,
-        '#9c27b0',
-        'R2'
-    );
-
-    dibujarPuntoCanvas(
-        c,
-        p.base,
-        '#00aaff',
-        'BASE'
-    );
-
-    dibujarPuntoCanvas(
-        c,
-        p.punta,
-        '#00c853',
-        'PUNTA'
-    );
-
-    /*
-       ALTURA EN VERDE
-    */
-
-    if(p.base&&p.punta){
-
+    // ALTURA EN VERDE
+    if(p.base && p.punta){
         c.beginPath();
-
-        c.moveTo(
-            p.base.x,
-            p.base.y
-        );
-
-        c.lineTo(
-            p.punta.x,
-            p.punta.y
-        );
-
-        c.strokeStyle='#00ff88';
-
-        c.lineWidth=Math.max(
-            3,
-            w/700
-        );
-
+        c.moveTo(p.base.x, p.base.y);
+        c.lineTo(p.punta.x, p.punta.y);
+        c.strokeStyle = '#00ff88';
+        c.lineWidth = Math.max(3, w / 700);
         c.stroke();
     }
 }
