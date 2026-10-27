@@ -1977,27 +1977,40 @@ let measurePoints={
 
 let measureStep='r1';
 
+    let measureView = {
+    scale: 1,
+    baseWidth: 0,
+    baseHeight: 0,
+    left: 0,
+    top: 0,
+    startX: 0,
+    startY: 0,
+    startLeft: 0,
+    startTop: 0,
+    moved: false
+};
+
 /* =========================================================
    ABRIR EDITOR
 ========================================================= */
+
 
 
 function abrirEditorMedicion(){
 
     cerrarEditorMedicion();
 
+    const container = document.getElementById('cameraContainer');
+
     measureEditor = document.createElement('div');
     measureEditor.className = 'measureEditor';
-    measureEditor.style.position = 'absolute';
-    measureEditor.style.overflow = 'hidden';
-    measureEditor.style.touchAction = 'none';
 
     measureCanvas = document.createElement('canvas');
     measureCanvas.className = 'measureCanvas';
 
     measureEditor.appendChild(measureCanvas);
 
-    // MIRA FIJA DE PRECISIÓN
+    // MIRA FIJA: SOLO VISUAL, NO BLOQUEA TOQUES
     const miraMedicion = document.createElement('div');
     miraMedicion.id = 'miraMedicion';
 
@@ -2011,30 +2024,20 @@ function abrirEditorMedicion(){
     miraMedicion.innerHTML = `
         <div style="
             position:absolute;
-            left:0;
-            right:0;
-            top:50%;
+            left:0; right:0; top:50%;
             height:1px;
             background:#00ffff;
-            box-shadow:0 0 2px #000;
         "></div>
-
         <div style="
             position:absolute;
-            top:0;
-            bottom:0;
-            left:50%;
+            top:0; bottom:0; left:50%;
             width:1px;
             background:#00ffff;
-            box-shadow:0 0 2px #000;
         "></div>
-
         <div style="
             position:absolute;
-            left:50%;
-            top:50%;
-            width:14px;
-            height:14px;
+            left:50%; top:50%;
+            width:14px; height:14px;
             border:2px solid white;
             border-radius:50%;
             transform:translate(-50%,-50%);
@@ -2050,111 +2053,119 @@ function abrirEditorMedicion(){
     instruction.id = 'measureInstruction';
     measureEditor.appendChild(instruction);
 
-    // BARRA DE HERRAMIENTAS
+    // BARRA DE BOTONES
     const toolbar = document.createElement('div');
     toolbar.className = 'measureToolbar';
 
     const undo = document.createElement('button');
     undo.id = 'measureUndo';
+    undo.type = 'button';
     undo.textContent = '↩ DESHACER';
 
     const finish = document.createElement('button');
     finish.id = 'measureFinish';
+    finish.type = 'button';
     finish.textContent = '✅ TERMINAR';
 
     const cancel = document.createElement('button');
     cancel.id = 'measureCancel';
+    cancel.type = 'button';
     cancel.textContent = '❌ CANCELAR';
 
     const zoomMenos = document.createElement('button');
+    zoomMenos.type = 'button';
     zoomMenos.textContent = '− ZOOM';
 
     const zoomMas = document.createElement('button');
+    zoomMas.type = 'button';
     zoomMas.textContent = '+ ZOOM';
 
     const zoomReset = document.createElement('button');
+    zoomReset.type = 'button';
     zoomReset.textContent = 'AJUSTAR';
 
-    toolbar.appendChild(undo);
-    toolbar.appendChild(finish);
-    toolbar.appendChild(cancel);
-    toolbar.appendChild(zoomMenos);
-    toolbar.appendChild(zoomMas);
-    toolbar.appendChild(zoomReset);
+    toolbar.append(
+        undo,
+        finish,
+        cancel,
+        zoomMenos,
+        zoomMas,
+        zoomReset
+    );
 
     measureEditor.appendChild(toolbar);
+    container.appendChild(measureEditor);
 
-    document
-        .getElementById('cameraContainer')
-        .appendChild(measureEditor);
+    // OCULTAR CONTROLES DE CÁMARA
+    takeButton.style.display = 'none';
+    signalButton.style.display = 'none';
+    cancelButton.style.display = 'none';
+
+    setStatus('Cargando fotografía para medir…');
+
+    // CONECTAR BOTONES INMEDIATAMENTE
+    undo.addEventListener('click', deshacerMedicion);
+
+    finish.addEventListener('click', finalizarMedicion);
+
+    cancel.addEventListener('click', () => {
+        cerrarEditorMedicion();
+        setStatus('Medición cancelada. Puedes tomar otra fotografía.');
+    });
+
+    zoomMas.addEventListener('click', () => zoomMedicion(1.25));
+    zoomMenos.addEventListener('click', () => zoomMedicion(0.8));
+    zoomReset.addEventListener('click', restablecerVistaMedicion);
 
     // CARGAR FOTO
     measureImage = new Image();
 
     measureImage.onload = () => {
+        try {
+            if (!measureCanvas || !measureEditor) return;
 
-        measureCanvas.width = measureImage.naturalWidth;
-        measureCanvas.height = measureImage.naturalHeight;
+            measureCanvas.width = measureImage.naturalWidth;
+            measureCanvas.height = measureImage.naturalHeight;
 
-        ajustarCanvasMedicion();
-        dibujarEditorMedicion();
+            // Inicializar vista antes de dibujar
+            ajustarCanvasMedicion();
+            dibujarEditorMedicion();
+            actualizarInstruccion();
 
-        // MOVIMIENTO DE FOTO Y COLOCACIÓN CON LA MIRA
-        measureCanvas.addEventListener(
-            'pointerdown',
-            iniciarMovimientoMedicion
-        );
-
-        measureCanvas.addEventListener(
-            'pointermove',
-            moverImagenMedicion
-        );
-
-        measureCanvas.addEventListener(
-            'pointerup',
-            terminarMovimientoMedicion
-        );
-
-        // BOTONES
-        undo.addEventListener('click', deshacerMedicion);
-        finish.addEventListener('click', finalizarMedicion);
-
-        cancel.addEventListener('click', () => {
-            cerrarEditorMedicion();
-            setStatus(
-                'Medición cancelada. Puedes tomar otra fotografía.'
+            measureCanvas.addEventListener(
+                'pointerdown',
+                iniciarMovimientoMedicion
             );
-        });
 
-        zoomMas.addEventListener('click', () => {
-            zoomMedicion(1.25);
-        });
+            measureCanvas.addEventListener(
+                'pointermove',
+                moverImagenMedicion
+            );
 
-        zoomMenos.addEventListener('click', () => {
-            zoomMedicion(0.8);
-        });
+            measureCanvas.addEventListener(
+                'pointerup',
+                terminarMovimientoMedicion
+            );
 
-        zoomReset.addEventListener('click', () => {
-            restablecerVistaMedicion();
-        });
+            measureCanvas.addEventListener(
+                'pointercancel',
+                terminarMovimientoMedicion
+            );
 
-        actualizarInstruccion();
+            setStatus('Marca R1, R2, BASE y PUNTA usando la mira central.');
+
+        } catch (error) {
+            console.error('Error al iniciar editor de medición:', error);
+            setStatus('Error al iniciar medición: ' + error.message);
+        }
     };
 
     measureImage.onerror = () => {
-
-        setStatus(
-            '❌ No se pudo cargar la fotografía para medir.'
-        );
-
+        setStatus('No se pudo cargar la fotografía para medir.');
         cerrarEditorMedicion();
     };
 
     measureImage.src = fotoBase;
-
-    takeButton.style.display = 'none';
-    signalButton.style.display = 'none';
-    cancelButton.style.display = 'none';
 }
 
 
